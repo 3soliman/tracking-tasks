@@ -69,16 +69,13 @@ export function buildSessionSummary(click: ReportClick): string {
   const total = click.activeDurationSeconds + click.externalDurationSeconds;
   const required = click.requiredDurationSeconds;
 
-  if (!total && click.manualInteractionCount === 0 && click.interactionCount <= 1) {
+  if (!total && click.interactionCount <= 1) {
     return "لم يبدأ بعد";
   }
 
   const achieved = formatDurationLong(total || click.visibleDurationSeconds);
   const requiredLabel = formatDurationLong(required);
-  const interactions =
-    click.manualInteractionCount > 0
-      ? `${click.manualInteractionCount} تفاعل مسجل`
-      : `${click.interactionCount} حدث`;
+  const interactions = `${click.interactionCount} حدث`;
 
   if (click.completionStatus === "completed") {
     return `أنجز ${achieved} من ${requiredLabel} — ${interactions}`;

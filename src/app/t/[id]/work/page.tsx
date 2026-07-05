@@ -1,7 +1,6 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { TaskWorkSession } from "@/components/TaskWorkSession";
 
@@ -50,7 +49,6 @@ function WorkPageInner() {
         <div className="card">
           <h1 className="page-title">تعذر بدء المهمة</h1>
           <p>{error}</p>
-          <Link href="/">العودة للرئيسية</Link>
         </div>
       </div>
     );
