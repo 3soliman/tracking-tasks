@@ -2,12 +2,15 @@
   "name": "tracking-tasks",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",
-    "start": "next start -p 3000",
+    "start": "next start",
     "render:build": "prisma generate && prisma db push && npm run db:seed && next build",
-    "render:start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
+    "render:start": "next start",
     "postinstall": "prisma generate",
     "lint": "next lint",
     "db:generate": "prisma generate",

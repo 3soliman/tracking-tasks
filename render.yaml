@@ -4,12 +4,10 @@ services:
     runtime: node
     plan: free
     buildCommand: npm install && npm run render:build
-    startCommand: npm run render:start
+    startCommand: npm start
     envVars:
       - key: NODE_VERSION
         value: "20"
-      - key: NODE_ENV
-        value: production
       - key: DATABASE_URL
         sync: false
       - key: NEXT_PUBLIC_APP_URL
