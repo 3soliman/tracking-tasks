@@ -40,7 +40,7 @@ export function computeCompletion(
     };
   }
 
-  if (basis >= 30 || metrics.interaction_count >= 3) {
+  if (basis >= 30 || metrics.manual_interaction_count >= 3) {
     return {
       completionPercent: Math.round(percent * 10) / 10,
       completionStatus: "partial",

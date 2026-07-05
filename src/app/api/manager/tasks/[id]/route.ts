@@ -9,6 +9,7 @@ import {
   annotateVisitorsWithIpAnalysis,
   buildIpGroups,
   buildVisitorProfile,
+  countSharedNetworkGroups,
   countUniqueIps,
   countUniqueVisitors,
   formatIpDisplay,
@@ -186,7 +187,7 @@ export async function GET(
   const visitors = annotateVisitorsWithIpAnalysis(rawVisitors);
   const ipGroups = buildIpGroups(visitors);
   const uniqueIpCount = countUniqueIps(task.clicks);
-  const suspiciousIpCount = ipGroups.filter((g) => g.suspicious_multi_browser).length;
+  const sharedNetworkCount = countSharedNetworkGroups(ipGroups);
   const visitorCount = countUniqueVisitors(task.clicks);
 
   return Response.json(
@@ -202,7 +203,7 @@ export async function GET(
         public_url: getPublicTaskUrl(task.id),
         visitor_count: visitorCount,
         unique_ip_count: uniqueIpCount,
-        suspicious_ip_count: suspiciousIpCount,
+        shared_network_count: sharedNetworkCount,
         session_count: task.clicks.length,
         completed_visitors: visitors.filter((v) => v.completed_sessions > 0).length,
         in_progress_visitors: visitors.filter((v) => v.in_progress_sessions > 0).length,

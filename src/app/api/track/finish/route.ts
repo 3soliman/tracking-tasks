@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     required_duration_seconds: required,
     actual_duration_seconds: actual,
     external_duration_seconds: metrics.external_duration_seconds,
-    summary: `المطلوب ${formatDurationLong(required)} — الفعلي ${formatDurationLong(actual)} (خارجي: ${formatDurationLong(metrics.external_duration_seconds)})`,
+    manual_interactions: metrics.manual_interaction_count,
+    summary: `المطلوب ${formatDurationLong(required)} — الفعلي ${formatDurationLong(actual)} (خارجي: ${formatDurationLong(metrics.external_duration_seconds)}، تفاعلات: ${metrics.manual_interaction_count})`,
   });
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 
 export default function PublicTaskEntryPage() {
@@ -29,6 +30,7 @@ export default function PublicTaskEntryPage() {
         <div className="card">
           <h1 className="page-title">تعذر فتح المهمة</h1>
           <p>{error}</p>
+          <Link href="/">العودة للرئيسية</Link>
         </div>
       </main>
     );

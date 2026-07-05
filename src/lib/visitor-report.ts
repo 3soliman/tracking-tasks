@@ -60,15 +60,17 @@ export function buildVisitorDisplayName(
   ipHash: string | null | undefined,
   browser: string | null,
   os: string | null,
-  device: string | null
+  device: string | null,
+  visitorId?: string | null
 ): string {
-  const ip = formatIpDisplay(ipAddress, ipHash);
   const parts: string[] = [];
-  if (ip) parts.push(ip);
   if (browser && browser !== "غير معروف") parts.push(browser);
   if (os && os !== "غير معروف") parts.push(os);
   if (device && device !== "كمبيوتر") parts.push(device);
-  return parts.length ? parts.join(" · ") : "زائر — IP غير معروف";
+  const ip = formatIpDisplay(ipAddress, ipHash);
+  if (ip) parts.push(ip);
+  if (visitorId) parts.push(`#${visitorId.slice(-6)}`);
+  return parts.length ? parts.join(" · ") : "زائر — غير معروف";
 }
 
 export function countUniqueIps(
@@ -91,28 +93,47 @@ export function countUniqueIps(
 
 export type VisitorWithIpAnalysis<T> = T & {
   same_ip_visitor_count: number;
-  suspicious_multi_browser: boolean;
+  shared_ip: boolean;
+  duplicate_browser_on_ip: boolean;
 };
 
 export function annotateVisitorsWithIpAnalysis<
-  T extends { ip_group_key: string | null },
+  T extends {
+    ip_group_key: string | null;
+    browser: string | null;
+  },
 >(visitors: T[]): VisitorWithIpAnalysis<T>[] {
   const ipCounts = new Map<string, number>();
+  const ipBrowserCounts = new Map<string, number>();
+
   for (const visitor of visitors) {
-    const key = visitor.ip_group_key;
-    if (!key) continue;
-    ipCounts.set(key, (ipCounts.get(key) ?? 0) + 1);
+    const ipKey = visitor.ip_group_key;
+    if (ipKey) ipCounts.set(ipKey, (ipCounts.get(ipKey) ?? 0) + 1);
+    if (ipKey && visitor.browser) {
+      const combo = `${ipKey}|${visitor.browser}`;
+      ipBrowserCounts.set(combo, (ipBrowserCounts.get(combo) ?? 0) + 1);
+    }
   }
 
   return visitors.map((visitor) => {
-    const key = visitor.ip_group_key;
-    const sameIpCount = key ? (ipCounts.get(key) ?? 1) : 1;
+    const ipKey = visitor.ip_group_key;
+    const sameIpCount = ipKey ? (ipCounts.get(ipKey) ?? 1) : 1;
+    const ipBrowserKey = ipKey && visitor.browser ? `${ipKey}|${visitor.browser}` : null;
+    const duplicateBrowser = ipBrowserKey ? (ipBrowserCounts.get(ipBrowserKey) ?? 1) > 1 : false;
+
     return {
       ...visitor,
       same_ip_visitor_count: sameIpCount,
-      suspicious_multi_browser: sameIpCount > 1,
+      shared_ip: sameIpCount > 1,
+      duplicate_browser_on_ip: duplicateBrowser,
     };
   });
+}
+
+export function countSharedNetworkGroups<
+  T extends { shared_network: boolean },
+>(groups: T[]): number {
+  return groups.filter((group) => group.shared_network).length;
 }
 
 export function buildIpGroups<
@@ -122,7 +143,6 @@ export function buildIpGroups<
     display_name: string;
     browser: string | null;
     session_count: number;
-    suspicious_multi_browser: boolean;
   },
 >(visitors: T[]) {
   const groups = new Map<
@@ -132,7 +152,8 @@ export function buildIpGroups<
       visitor_count: number;
       session_count: number;
       browsers: string[];
-      suspicious_multi_browser: boolean;
+      shared_network: boolean;
+      duplicate_browser: boolean;
       visitors: Array<{ display_name: string; browser: string | null; session_count: number }>;
     }
   >();
@@ -149,7 +170,6 @@ export function buildIpGroups<
       if (visitor.browser && !existing.browsers.includes(visitor.browser)) {
         existing.browsers.push(visitor.browser);
       }
-      existing.suspicious_multi_browser = existing.visitor_count > 1;
       existing.visitors.push({
         display_name: visitor.display_name,
         browser: visitor.browser,
@@ -161,7 +181,8 @@ export function buildIpGroups<
         visitor_count: 1,
         session_count: visitor.session_count,
         browsers: visitor.browser ? [visitor.browser] : [],
-        suspicious_multi_browser: false,
+        shared_network: false,
+        duplicate_browser: false,
         visitors: [
           {
             display_name: visitor.display_name,
@@ -171,6 +192,16 @@ export function buildIpGroups<
         ],
       });
     }
+  }
+
+  for (const group of groups.values()) {
+    group.shared_network = group.visitor_count > 1;
+    const browserTotals = new Map<string, number>();
+    for (const entry of group.visitors) {
+      if (!entry.browser) continue;
+      browserTotals.set(entry.browser, (browserTotals.get(entry.browser) ?? 0) + 1);
+    }
+    group.duplicate_browser = [...browserTotals.values()].some((count) => count > 1);
   }
 
   return Array.from(groups.values()).sort((a, b) => b.visitor_count - a.visitor_count);
@@ -210,7 +241,14 @@ export function buildVisitorProfile(clicks: ClickLike[], visitor: VisitorLike) {
     ip_address: formatIpDisplay(ipAddress, ipHash),
     ip_hash: ipHash,
     ip_group_key: groupKey,
-    display_name: buildVisitorDisplayName(ipAddress, ipHash, parsed.browser, parsed.os, parsed.device),
+    display_name: buildVisitorDisplayName(
+      ipAddress,
+      ipHash,
+      parsed.browser,
+      parsed.os,
+      parsed.device,
+      visitor?.id
+    ),
     registered_at: visitor?.firstSeenAt ?? firstSeenOnTask,
     last_active_at: visitor?.lastSeenAt ?? lastSeenOnTask,
     first_seen_on_task: firstSeenOnTask,

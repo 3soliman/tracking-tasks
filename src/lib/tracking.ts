@@ -29,11 +29,3 @@ export function appendSessionToUrl(targetUrl: string, sessionToken: string): str
   }
 }
 
-export function isRapidDuplicate(
-  lastClickAt: Date | null,
-  thresholdSeconds = 10
-): boolean {
-  if (!lastClickAt) return false;
-  const elapsed = Date.now() - lastClickAt.getTime();
-  return elapsed < thresholdSeconds * 1000;
-}

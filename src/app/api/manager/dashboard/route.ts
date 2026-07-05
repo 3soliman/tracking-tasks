@@ -65,7 +65,7 @@ export async function GET() {
       public_url: getPublicTaskUrl(task.id),
       visitor_count: uniqueVisitors,
       unique_ip_count: uniqueIps,
-      possible_multi_browser: uniqueVisitors > uniqueIps,
+      possible_shared_network: uniqueVisitors > uniqueIps,
       completed_visitor_count: completedVisitors,
       session_count: task.clicks.length,
       in_progress_count: task.clicks.filter((c) => c.completionStatus === "in_progress").length,

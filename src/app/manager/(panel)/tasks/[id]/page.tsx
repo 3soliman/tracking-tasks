@@ -31,7 +31,7 @@ type TaskReport = {
     public_url: string;
     visitor_count: number;
     unique_ip_count: number;
-    suspicious_ip_count: number;
+    shared_network_count: number;
     session_count: number;
     completed_visitors: number;
     in_progress_visitors: number;
@@ -41,7 +41,8 @@ type TaskReport = {
     visitor_count: number;
     session_count: number;
     browsers: string[];
-    suspicious_multi_browser: boolean;
+    shared_network: boolean;
+    duplicate_browser: boolean;
     visitors: Array<{ display_name: string; browser: string | null; session_count: number }>;
   }>;
   visitors: Array<{
@@ -51,7 +52,8 @@ type TaskReport = {
     ip_address: string | null;
     ip_group_key: string | null;
     same_ip_visitor_count: number;
-    suspicious_multi_browser: boolean;
+    shared_ip: boolean;
+    duplicate_browser_on_ip: boolean;
     registered_at: string;
     last_active_at: string;
     first_seen_on_task: string;
@@ -128,19 +130,36 @@ export default function ManagerTaskReportPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setReport(null);
-    setLoadError(null);
+    let cancelled = false;
 
-    fetch(`/api/manager/tasks/${params.id}`, { cache: "no-store" })
-      .then(async (r) => {
+    async function loadReport() {
+      try {
+        const r = await fetch(`/api/manager/tasks/${params.id}`, { cache: "no-store" });
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
           throw new Error(body.error ?? "تعذر تحميل التقرير");
         }
-        return r.json();
-      })
-      .then(setReport)
-      .catch((err: Error) => setLoadError(err.message));
+        const data = await r.json();
+        if (!cancelled) {
+          setReport(data);
+          setLoadError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : "تعذر تحميل التقرير");
+        }
+      }
+    }
+
+    setReport(null);
+    setLoadError(null);
+    void loadReport();
+
+    const timer = window.setInterval(loadReport, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, [params.id]);
 
   async function copyLink() {
@@ -194,10 +213,10 @@ export default function ManagerTaskReportPage() {
 
       <div className="grid-3" style={{ marginBottom: 20 }}>
         <div className="stat-card">
-          <div className="stat-label">زيارات (متصفحات)</div>
+          <div className="stat-label">زوار فريدون (كوكيز)</div>
           <div className="stat-value">{report.task.visitor_count}</div>
           <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
-            كل كوكي = متصفح منفصل
+            كل متصفح/جهاز = كوكي منفصل
           </div>
         </div>
         <div className="stat-card">
@@ -205,13 +224,16 @@ export default function ManagerTaskReportPage() {
           <div className="stat-value">{report.task.unique_ip_count}</div>
           <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
             {report.task.visitor_count > report.task.unique_ip_count
-              ? "⚠ احتمال متصفحات متعددة"
-              : "شخص/جهاز لكل IP"}
+              ? "شبكة مشتركة (مكتب / WiFi)"
+              : "IP مختلف لكل زائر"}
           </div>
         </div>
         <div className="stat-card">
-          <div className="stat-label">IP مشبوه (متعدد)</div>
-          <div className="stat-value">{report.task.suspicious_ip_count}</div>
+          <div className="stat-label">IP مشتركة</div>
+          <div className="stat-value">{report.task.shared_network_count}</div>
+          <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>
+            أكثر من زائر على نفس IP
+          </div>
         </div>
         <div className="stat-card">
           <div className="stat-label">إجمالي الجلسات</div>
@@ -225,18 +247,12 @@ export default function ManagerTaskReportPage() {
         </div>
       </div>
 
-      {report.ip_groups?.some((g) => g.suspicious_multi_browser) && (
-        <div className="alert alert-error" style={{ marginBottom: 20 }}>
-          <strong>تنبيه احتيال محتمل:</strong> نفس عنوان IP ظهر من أكثر من متصفح على هذه المهمة.
-          قد يكون الموظف يفتح الرابط من Chrome و Firefox أو نافذة خاصة ليُحسب أكثر من مرة.
-        </div>
-      )}
-
       {report.ip_groups && report.ip_groups.length > 0 && (
         <section className="card" style={{ marginBottom: 20 }}>
           <h3 style={{ marginTop: 0 }}>تجميع حسب IP</h3>
           <p className="muted" style={{ fontSize: 14, marginBottom: 16 }}>
-            نفس IP من عدة متصفحات = احتمال أن شخصاً واحداً يحاول التكرار
+            نفس IP لا يعني نفس الشخص — المكتب والWiFi والشبكات المحمولة (CGNAT) تشارك عنواناً
+            واحداً. العدد الدقيق للزوار = الكوكيز الفريدة أعلاه.
           </p>
           <div style={{ overflowX: "auto" }}>
             <table className="table">
@@ -244,9 +260,9 @@ export default function ManagerTaskReportPage() {
                 <tr>
                   <th>IP</th>
                   <th>متصفحات</th>
-                  <th>عدد الزيارات</th>
+                  <th>زوار (كوكيز)</th>
                   <th>جلسات</th>
-                  <th>حالة</th>
+                  <th>ملاحظة</th>
                 </tr>
               </thead>
               <tbody>
@@ -259,10 +275,12 @@ export default function ManagerTaskReportPage() {
                     <td>{group.visitor_count}</td>
                     <td>{group.session_count}</td>
                     <td>
-                      {group.suspicious_multi_browser ? (
-                        <span className="badge badge-danger">متصفحات متعددة</span>
+                      {group.duplicate_browser ? (
+                        <span className="badge badge-warning">متصفح مكرر</span>
+                      ) : group.shared_network ? (
+                        <span className="badge badge-info">شبكة مشتركة</span>
                       ) : (
-                        <span className="badge badge-success">طبيعي</span>
+                        <span className="badge badge-success">زائر واحد</span>
                       )}
                     </td>
                   </tr>
@@ -291,9 +309,14 @@ export default function ManagerTaskReportPage() {
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginBottom: 16, flexWrap: "wrap" }}>
               <div>
                 <strong style={{ fontSize: 18 }}>{row.display_name}</strong>
-                {row.suspicious_multi_browser && (
-                  <span className="badge badge-danger" style={{ marginInlineStart: 8 }}>
-                    نفس IP — {row.same_ip_visitor_count} متصفحات
+                {row.shared_ip && (
+                  <span className="badge badge-info" style={{ marginInlineStart: 8 }}>
+                    شبكة مشتركة ({row.same_ip_visitor_count} زائر)
+                  </span>
+                )}
+                {row.duplicate_browser_on_ip && (
+                  <span className="badge badge-warning" style={{ marginInlineStart: 8 }}>
+                    نفس المتصفح مرتين على IP
                   </span>
                 )}
                 {row.latest_session && (
@@ -410,6 +433,10 @@ export default function ManagerTaskReportPage() {
                   <MiniStat
                     label="وقت على الموقع الخارجي"
                     value={formatDurationLong(row.latest_session.external_seconds ?? 0)}
+                  />
+                  <MiniStat
+                    label="تفاعلات مسجلة"
+                    value={String(row.latest_session.manual_interactions ?? 0)}
                   />
                   <MiniStat
                     label="وقت على لوحة المتابعة"

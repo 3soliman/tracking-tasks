@@ -23,7 +23,7 @@ type Dashboard = {
     public_url: string;
     visitor_count: number;
     unique_ip_count: number;
-    possible_multi_browser: boolean;
+    possible_shared_network: boolean;
     completed_visitor_count: number;
     session_count: number;
     in_progress_count: number;
@@ -36,16 +36,33 @@ export default function ManagerDashboardPage() {
   const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/manager/dashboard")
-      .then(async (r) => {
+    let cancelled = false;
+
+    async function loadDashboard() {
+      try {
+        const r = await fetch("/api/manager/dashboard", { cache: "no-store" });
         if (!r.ok) {
           const body = await r.json().catch(() => ({}));
           throw new Error(body.error ?? "تعذر تحميل البيانات");
         }
-        return r.json();
-      })
-      .then(setData)
-      .catch((err: Error) => setLoadError(err.message));
+        const json = await r.json();
+        if (!cancelled) {
+          setData(json);
+          setLoadError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : "تعذر تحميل البيانات");
+        }
+      }
+    }
+
+    void loadDashboard();
+    const timer = window.setInterval(loadDashboard, 3000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
   }, []);
 
   if (loadError) {
@@ -133,8 +150,8 @@ export default function ManagerDashboardPage() {
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
                     <span className="badge badge-info">{task.visitor_count} متصفح</span>
                     <span className="badge badge-muted">{task.unique_ip_count} IP</span>
-                    {task.possible_multi_browser && (
-                      <span className="badge badge-danger">⚠ IP مكرر</span>
+                    {task.possible_shared_network && (
+                      <span className="badge badge-info">شبكة مشتركة</span>
                     )}
                     <span className="badge badge-muted">{task.session_count} جلسة</span>
                     {task.in_progress_count > 0 && (

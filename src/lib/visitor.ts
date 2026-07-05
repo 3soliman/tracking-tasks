@@ -14,16 +14,22 @@ export type VisitorInfo = {
   key: string;
 };
 
-function generateVisitorLabel(ipAddress: string, ipHash: string, userAgent?: string): string {
+function generateVisitorLabel(
+  ipAddress: string,
+  ipHash: string,
+  userAgent?: string,
+  visitorId?: string
+): string {
   const parsed = parseUserAgent(userAgent);
   const label = buildVisitorDisplayName(
     ipAddress,
     ipHash,
     parsed.browser,
     parsed.os,
-    parsed.device
+    parsed.device,
+    visitorId
   );
-  if (label !== "زائر — IP غير معروف") return label;
+  if (label !== "زائر — غير معروف") return label;
   return `ز-${nanoid(4)}`;
 }
 
@@ -54,12 +60,11 @@ export async function getOrCreateVisitor(request: Request): Promise<VisitorInfo>
   if (existingKey) {
     const visitor = await prisma.visitor.findUnique({ where: { visitorKey: existingKey } });
     if (visitor) {
-      const label = generateVisitorLabel(ipAddress, ipHash, userAgent);
+      const label = generateVisitorLabel(ipAddress, ipHash, userAgent, visitor.id);
       const shouldRefreshLabel =
         visitor.label.startsWith("ز-") ||
-        visitor.label.includes("IP ") ||
         !visitor.ipAddress ||
-        label !== visitor.label;
+        !visitor.label.includes("#");
 
       await prisma.visitor.update({
         where: { id: visitor.id },
@@ -80,13 +85,26 @@ export async function getOrCreateVisitor(request: Request): Promise<VisitorInfo>
   }
 
   const key = nanoid(32);
-  const label = generateVisitorLabel(ipAddress, ipHash, userAgent);
 
   const visitor = await prisma.visitor.create({
-    data: { visitorKey: key, label, ipAddress, ipHash, userAgent },
+    data: {
+      visitorKey: key,
+      label: `ز-${nanoid(4)}`,
+      ipAddress,
+      ipHash,
+      userAgent,
+    },
   });
+
+  const label = generateVisitorLabel(ipAddress, ipHash, userAgent, visitor.id);
+  if (label !== visitor.label) {
+    await prisma.visitor.update({
+      where: { id: visitor.id },
+      data: { label },
+    });
+  }
 
   await setVisitorCookie(key);
 
-  return { id: visitor.id, label: visitor.label, key: visitor.visitorKey };
+  return { id: visitor.id, label, key: visitor.visitorKey };
 }

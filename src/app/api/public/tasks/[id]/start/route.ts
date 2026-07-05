@@ -1,11 +1,6 @@
 import { prisma } from "@/lib/db";
 import { getPublicTaskUrl } from "@/lib/public-task";
-import {
-  generateSessionToken,
-  getClientIp,
-  hashIp,
-  isRapidDuplicate,
-} from "@/lib/tracking";
+import { generateSessionToken, getClientIp, hashIp } from "@/lib/tracking";
 import { isExternalUrl } from "@/lib/url";
 import { getOrCreateVisitor } from "@/lib/visitor";
 
@@ -48,25 +43,6 @@ export async function POST(
       return { click: inProgress, resumed: true, created: false };
     }
 
-    const recent = await tx.trackingClick.findFirst({
-      where: {
-        taskId,
-        visitorId: visitor.id,
-        clickedAt: { gte: new Date(Date.now() - 5000) },
-      },
-      orderBy: { clickedAt: "desc" },
-    });
-
-    if (recent?.sessionToken) {
-      return { click: recent, resumed: true, created: false };
-    }
-
-    const lastFinished = await tx.trackingClick.findFirst({
-      where: { taskId, visitorId: visitor.id, isValid: true },
-      orderBy: { clickedAt: "desc" },
-    });
-
-    const rapidDuplicate = isRapidDuplicate(lastFinished?.clickedAt ?? null);
     const sessionToken = generateSessionToken();
 
     const click = await tx.trackingClick.create({
@@ -82,9 +58,8 @@ export async function POST(
         userAgent,
         referer,
         utmCampaign: task.campaignName,
-        isValid: !rapidDuplicate,
-        invalidReason: rapidDuplicate ? "rapid_duplicate" : null,
-        completionStatus: rapidDuplicate ? "abandoned" : "in_progress",
+        isValid: true,
+        completionStatus: "in_progress",
         activities: {
           create: {
             eventType: "session_start",
@@ -95,7 +70,7 @@ export async function POST(
       },
     });
 
-    return { click, resumed: false, created: !rapidDuplicate };
+    return { click, resumed: false, created: true };
   });
 
   return Response.json({
@@ -117,5 +92,6 @@ export async function POST(
     is_valid: result.click.isValid,
     invalid_reason: result.click.invalidReason,
     resumed: result.resumed,
+    created: result.created,
   });
 }

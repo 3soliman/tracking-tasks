@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 type Props = {
   title: string;
-  subtitle?: string;
+  subtitle: string;
   submitLabel: string;
   endpoint: "/api/auth/login";
   fields: Array<{ name: string; label: string; type?: string; placeholder?: string }>;
@@ -54,7 +54,7 @@ export function AuthForm({
     <div className="auth-page">
       <div className="card auth-card">
         <h1 className="page-title">{title}</h1>
-        {subtitle ? <p className="page-subtitle">{subtitle}</p> : null}
+        <p className="page-subtitle">{subtitle}</p>
 
         {error && <div className="alert alert-error">{error}</div>}
 
