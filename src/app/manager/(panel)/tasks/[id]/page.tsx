@@ -435,10 +435,6 @@ export default function ManagerTaskReportPage() {
                     value={formatDurationLong(row.latest_session.external_seconds ?? 0)}
                   />
                   <MiniStat
-                    label="تفاعلات مسجلة"
-                    value={String(row.latest_session.manual_interactions ?? 0)}
-                  />
-                  <MiniStat
                     label="وقت على لوحة المتابعة"
                     value={formatDurationLong(row.latest_session.active_seconds)}
                   />

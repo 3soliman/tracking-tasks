@@ -6,7 +6,6 @@ import { ActivityLog } from "@/components/ActivityLog";
 import { Ga4TaskClick } from "@/components/Ga4TaskClick";
 import { formatDuration, formatDurationLong } from "@/lib/format";
 import { resolveActivityDisplay } from "@/lib/activity-display";
-import { isMobileDevice } from "@/lib/device";
 import { sendTrackBeacon } from "@/lib/track-client";
 import { getHostname, isExternalUrl, isOnTaskTarget } from "@/lib/url";
 
@@ -51,14 +50,6 @@ type Metrics = {
 const HEARTBEAT_MS = 15000;
 const IDLE_MS = 45000;
 
-const MANUAL_ACTIONS = [
-  { type: "manual_click", label: "نقرت على رابط أو زر", short: "1" },
-  { type: "manual_read", label: "قرأت محتوى / مقالة", short: "2" },
-  { type: "manual_scroll", label: "مررت واستكشفت الصفحة", short: "3" },
-  { type: "manual_search", label: "بحثت أو استخدمت فلتر", short: "4" },
-  { type: "manual_book", label: "فتحت تفاصيل / حجز / سلة", short: "5" },
-] as const;
-
 function emptyMetrics(): Metrics {
   return {
     visible_duration_seconds: 0,
@@ -85,15 +76,6 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
   const [activityLog, setActivityLog] = useState<ActivityItem[]>([]);
   const [tick, setTick] = useState(0);
   const [lastExternalHostname, setLastExternalHostname] = useState<string | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    setIsMobile(isMobileDevice());
-    const mq = window.matchMedia("(max-width: 768px)");
-    const onChange = () => setIsMobile(isMobileDevice());
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
 
   const metricsRef = useRef<Metrics>(emptyMetrics());
   const pendingEventsRef = useRef<Array<{ event_type: string; label?: string; payload?: Record<string, unknown> }>>([]);
@@ -170,17 +152,6 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
       );
     },
     [buildEventPayload, session?.target_url]
-  );
-
-  const logManualAction = useCallback(
-    (event_type: string, label: string) => {
-      metricsRef.current.manual_interaction_count += 1;
-      metricsRef.current.click_count += 1;
-      lastActiveAtRef.current = Date.now();
-      pushEvent(event_type, label);
-      void sendHeartbeatRef.current?.();
-    },
-    [pushEvent]
   );
 
   const getMetrics = useCallback((): Metrics => ({ ...metricsRef.current }), []);
@@ -346,17 +317,9 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
       pushEvent("click", "نقرة على لوحة المتابعة");
     };
 
-    const onKeydown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      const action = MANUAL_ACTIONS.find((item) => item.short === e.key);
-      if (action) {
-        e.preventDefault();
-        logManualAction(action.type, action.label);
-        return;
-      }
+    const onKeydown = () => {
       metricsRef.current.keypress_count += 1;
       lastActiveAtRef.current = Date.now();
-      pushEvent("keydown", "ضغط مفتاح");
     };
 
     const onBlur = () => {
@@ -452,7 +415,7 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pagehide", onPageHide);
     };
-  }, [session, externalMode, pushEvent, logManualAction, sendHeartbeat, finishSession, sessionToken, getMetrics]);
+  }, [session, externalMode, pushEvent, sendHeartbeat, finishSession, sessionToken, getMetrics]);
 
   const metrics = getMetrics();
   const totalEngaged = getTotalEngaged();
@@ -562,7 +525,6 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
                 <li>
                   <strong>ارجع لهذه الصفحة</strong> من شريط التبويبات — يُحسب وقتك تلقائياً
                 </li>
-                <li>سجّل تفاعلاتك بالأزرار في الجانب {isMobile ? "أسفل الصفحة" : "الأيمن"}</li>
                 <li>عند الانتهاء اضغط «إنهاء المهمة»</li>
               </ol>
 
@@ -592,27 +554,8 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
             <Stat label="إجمالي الوقت" value={formatDuration(totalEngaged)} />
             <Stat label="على الموقع الخارجي" value={formatDuration(metrics.external_duration_seconds)} />
             <Stat label="على لوحة المتابعة" value={formatDuration(metrics.active_duration_seconds)} />
-            <Stat label="تفاعلات مسجلة" value={String(metrics.manual_interaction_count)} />
             <Stat label="خروج/عودة" value={String(metrics.blur_count)} />
-          </div>
-
-          <h4>تسجيل التفاعل على الموقع الخارجي</h4>
-          <p className="muted" style={{ fontSize: 13 }}>
-            {isMobile
-              ? "بعد كل نشاط على الموقع، ارجع لهذه الصفحة واضغط الزر المناسب."
-              : "بعد كل نشاط على الموقع، عد لهذه الصفحة واضغط الزر المناسب أو استخدم المفاتيح 1–5."}
-          </p>
-          <div className={`work-actions ${isMobile ? "work-sticky-actions" : ""}`}>
-            {MANUAL_ACTIONS.map((action) => (
-              <button
-                key={action.type}
-                type="button"
-                className="btn btn-secondary btn-block"
-                onClick={() => logManualAction(action.type, action.label)}
-              >
-                {isMobile ? action.label : `[${action.short}] ${action.label}`}
-              </button>
-            ))}
+            <Stat label="إجمالي الأحداث" value={String(metrics.interaction_count)} />
           </div>
 
           <h4>آخر الأحداث</h4>
