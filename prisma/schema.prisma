@@ -1,0 +1,166 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         String
+  employeeCode String?  @unique @map("employee_code")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  createdTasks TrackingTask[]           @relation("TaskCreator")
+  assignments  TrackingTaskAssignment[]
+  clicks       TrackingClick[]
+  sessions     Session[]
+
+  @@map("users")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("sessions")
+}
+
+model TrackingTask {
+  id                      String   @id @default(cuid())
+  title                   String
+  targetUrl               String   @map("target_url")
+  campaignName            String?  @map("campaign_name")
+  requiredDurationSeconds Int      @default(1800) @map("required_duration_seconds")
+  assignToAll             Boolean  @default(true) @map("assign_to_all")
+  status                  String   @default("active")
+  createdById             String?  @map("created_by_id")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  createdBy   User?                    @relation("TaskCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  assignments TrackingTaskAssignment[]
+  clicks      TrackingClick[]
+
+  @@map("tracking_tasks")
+}
+
+model TrackingTaskAssignment {
+  id          String    @id @default(cuid())
+  taskId      String    @map("task_id")
+  userId      String    @map("user_id")
+  assignedAt  DateTime  @default(now()) @map("assigned_at")
+  completedAt DateTime? @map("completed_at")
+  status      String    @default("pending")
+
+  task   TrackingTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clicks TrackingClick[]
+
+  @@unique([taskId, userId])
+  @@map("tracking_task_assignments")
+}
+
+model Visitor {
+  id         String   @id @default(cuid())
+  visitorKey String   @unique @map("visitor_key")
+  label      String
+  firstSeenAt DateTime @default(now()) @map("first_seen_at")
+  lastSeenAt  DateTime @default(now()) @map("last_seen_at")
+  userAgent  String?  @map("user_agent")
+  ipAddress  String?  @map("ip_address")
+  ipHash     String?  @map("ip_hash")
+
+  clicks TrackingClick[]
+
+  @@map("visitors")
+}
+
+model TrackingClick {
+  id                       String    @id @default(cuid())
+  taskId                   String    @map("task_id")
+  userId                   String?   @map("user_id")
+  visitorId                String?   @map("visitor_id")
+  assignmentId             String?   @map("assignment_id")
+  sessionToken             String?   @unique @map("session_token")
+  targetUrl                String    @map("target_url")
+  clickedAt                DateTime  @default(now()) @map("clicked_at")
+  endedAt                  DateTime? @map("ended_at")
+  ipAddress                String?   @map("ip_address")
+  ipHash                   String?   @map("ip_hash")
+  userAgent                String?   @map("user_agent")
+  referer                  String?
+  utmSource                String?   @map("utm_source")
+  utmCampaign              String?   @map("utm_campaign")
+  requiredDurationSeconds  Int       @default(0) @map("required_duration_seconds")
+  visibleDurationSeconds   Int       @default(0) @map("visible_duration_seconds")
+  activeDurationSeconds    Int       @default(0) @map("active_duration_seconds")
+  focusedDurationSeconds   Int       @default(0) @map("focused_duration_seconds")
+  durationSeconds          Int?      @map("duration_seconds")
+  interactionCount         Int       @default(0) @map("interaction_count")
+  clickCount               Int       @default(0) @map("click_count")
+  scrollCount              Int       @default(0) @map("scroll_count")
+  keypressCount            Int       @default(0) @map("keypress_count")
+  blurCount                Int       @default(0) @map("blur_count")
+  externalDurationSeconds  Int       @default(0) @map("external_duration_seconds")
+  manualInteractionCount   Int       @default(0) @map("manual_interaction_count")
+  trackingMode             String    @default("embedded") @map("tracking_mode")
+  completionPercent        Float     @default(0) @map("completion_percent")
+  completionStatus         String    @default("in_progress") @map("completion_status")
+  isValid                  Boolean   @default(true) @map("is_valid")
+  invalidReason            String?   @map("invalid_reason")
+  ga4Sent                  Boolean   @default(false) @map("ga4_sent")
+
+  task       TrackingTask            @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user       User?                   @relation(fields: [userId], references: [id], onDelete: SetNull)
+  visitor    Visitor?                @relation(fields: [visitorId], references: [id], onDelete: SetNull)
+  assignment TrackingTaskAssignment? @relation(fields: [assignmentId], references: [id], onDelete: SetNull)
+  activities TrackingActivityEvent[]
+
+  @@index([taskId, userId])
+  @@index([taskId, visitorId])
+  @@index([clickedAt])
+  @@index([completionStatus])
+  @@map("tracking_clicks")
+}
+
+model TrackingActivityEvent {
+  id        String   @id @default(cuid())
+  clickId   String   @map("click_id")
+  eventType String   @map("event_type")
+  label     String?
+  payload   String?  @db.Text
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  click TrackingClick @relation(fields: [clickId], references: [id], onDelete: Cascade)
+
+  @@index([clickId, occurredAt])
+  @@map("tracking_activity_events")
+}
+
+model GscPageMetric {
+  id          String   @id @default(cuid())
+  page        String
+  query       String   @default("")
+  date        DateTime
+  clicks      Int      @default(0)
+  impressions Int      @default(0)
+  ctr         Float    @default(0)
+  position    Float    @default(0)
+  fetchedAt   DateTime @default(now()) @map("fetched_at")
+
+  @@unique([page, query, date])
+  @@index([date])
+  @@map("gsc_page_metrics")
+}
