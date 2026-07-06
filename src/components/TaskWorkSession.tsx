@@ -529,7 +529,7 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
               </ol>
 
               <button className="btn btn-primary btn-block" type="button" onClick={openExternalSite}>
-                {externalOpened ? "إعادة فتح بكجات سياحية " : "فتح بكجات سياحية في تبويب جديد"}
+                {externalOpened ? "بكجات سياحية " : "فتح بكجات سياحية"}
               </button>
 
               <p className="muted" style={{ marginTop: 12 }}>
