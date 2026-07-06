@@ -520,7 +520,7 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
               <h2 style={{ marginTop: 0 }}>موقع خارجي — {getHostname(session.target_url)}</h2>
 
               <ol className="external-steps">
-                <li>اضغط «فتح هدف المهمة» أدناه</li>
+                <li>اضغط «بكجات سياحية» أدناه</li>
                 <li>اقرأ المحتوى في التبويب الجديد</li>
                 <li>
                   <strong>ارجع لهذه الصفحة</strong> من شريط التبويبات — يُحسب وقتك تلقائياً
@@ -529,7 +529,7 @@ export function TaskWorkSession({ sessionToken, visitor, taskId }: Props) {
               </ol>
 
               <button className="btn btn-primary btn-block" type="button" onClick={openExternalSite}>
-                {externalOpened ? "إعادة فتح هدف المهمة" : "فتح هدف المهمة في تبويب جديد"}
+                {externalOpened ? "إعادة فتح بكجات سياحية " : "فتح بكجات سياحية في تبويب جديد"}
               </button>
 
               <p className="muted" style={{ marginTop: 12 }}>
